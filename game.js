@@ -1,11 +1,17 @@
 const crypto = require("crypto");
 const readline = require("readline");
+const a = process.argv.slice(2);
 
-const compMoves = ["rock", "paper", "scissors", "lizard", "Spock"];
+if (a.length < 3 || a.length % 2 === 0) {
+  console.log(
+    "Invalid input.Length should be odd and greater than or equal to 3."
+  );
+  process.exit();
+}
 
 const getRandomMove = () => {
-  const randomIndex = Math.floor(Math.random() * compMoves.length);
-  return compMoves[randomIndex];
+  const randomIndex = Math.floor(Math.random() * a.length);
+  return a[randomIndex];
 };
 
 const secret = "compMove";
@@ -22,37 +28,32 @@ const recoveredMove =
     ? Buffer.from(computerMove, "utf-8").toString("utf8")
     : null;
 
-const determineWinner = (userMove, computerMove) => {
-  if (userMove === computerMove) {
-    return "tie";
-  } else if (
-    (userMove === "rock" &&
-      (computerMove === "scissors" || computerMove === "lizard")) ||
-    (userMove === "paper" &&
-      (computerMove === "rock" || computerMove === "Spock")) ||
-    (userMove === "scissors" &&
-      (computerMove === "paper" || computerMove === "lizard")) ||
-    (userMove === "lizard" &&
-      (computerMove === "paper" || computerMove === "Spock")) ||
-    (userMove === "Spock" &&
-      (computerMove === "rock" || computerMove === "scissors"))
-  ) {
-    return "user";
-  } else {
-    return "computer";
-  }
-};
-
-const a = process.argv.slice(2);
-
-const moves = {};
-a.forEach((move, index) => {
-  moves[(index + 1).toString()] = move;
-});
-
 const rockPaperScissors = (a) => {
+  const movesTable = {};
+
+  for (let i = 0; i < a.length; i++) {
+    const move = a[i];
+    const beats = a
+      .slice(i + 1)
+      .concat(a.slice(0, i))
+      .slice(0, a.length / 2);
+    const losesTo = a.slice().filter((m) => !beats.includes(m) && m !== move);
+    movesTable[move] = { beats, losesTo };
+  }
+
+  const helpTable = (moves) => {
+    const header = ["Your Move", "Wins Against", "Lose Against"];
+    const rows = moves.map((move) => {
+      const beats = movesTable[move].beats.join(", ");
+      const losesTo = movesTable[move].losesTo.join(", ");
+      return [move, beats, losesTo];
+    });
+    console.table([header, ...rows]);
+  };
+
   console.log(`HMAC key: ${secureRandomHmac}`);
   console.log("Available moves:");
+
   for (let i = 0; i < a.length; i++) {
     let n = 1;
     console.log(`${n + i} - ${a[i]}`);
@@ -68,44 +69,31 @@ const rockPaperScissors = (a) => {
     rl.close();
 
     if (answer === "?") {
-      console.log(`
-How to Win:
-+-----------+------------------------+--------------------------------------+
-| Your Move | Wins Against            | Lose Against                         |
-+-----------+------------------------+--------------------------------------+
-| Rock      | Scissors, Lizard        | Paper, Spock                         |
-| Paper     | Rock, Spock             | Scissors, Lizard                     |
-| Scissors  | Paper, Lizard           | Rock, Spock                          |
-| Lizard    | Paper, Spock            | Rock, Scissors                       |
-| Spock     | Rock, Scissors          | Paper, Lizard                        |
-+-----------+------------------------+--------------------------------------+`);
+      helpTable(a);
     } else if (answer === "0") {
       console.log("Goodbye!");
       process.exit();
     }
 
-    const move = moves[answer];
-    if (move) {
-      console.log(`Your move is ${move}`);
+    const moves = {};
+    a.forEach((move, index) => {
+      moves[(index + 1).toString()] = move;
+    });
+
+    const userMove = moves[answer];
+
+    if (userMove && a.length >= 3) {
+      console.log(`Your move is ${userMove}`);
       console.log(`Computer move is ${recoveredMove}`);
 
-      const winner = determineWinner(move, recoveredMove);
-
-      if (winner === "user") {
-        console.log("You win!");
-      } else if (winner === "computer") {
-        console.log("Computer wins!");
-      } else {
+      if (userMove === recoveredMove) {
         console.log("It's a tie!");
+      } else if (movesTable[userMove].beats.includes(recoveredMove)) {
+        console.log("You win!");
+      } else {
+        console.log("Computer wins!");
       }
-
       console.log(`HMAC key: ${secureRandomHmac}`);
-    } else {
-      if (answer !== move && answer !== "?") {
-        console.log(
-          `Invalid move: ${answer}. Enter a number from the list above or type ? for help.`
-        );
-      }
     }
   });
 };
